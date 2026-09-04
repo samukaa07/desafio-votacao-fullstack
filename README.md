@@ -83,4 +83,85 @@ Exemplos de retorno do serviço
 
 
 
+
+
+---
+
+## Solução implementada
+
+Este fork contém a implementação do desafio, dividida em duas pastas:
+
+- `backend/` - API REST em Java 17 + Spring Boot 3
+- `frontend/` - interface em React que consome a API
+
+### Backend
+
+**Stack:** Spring Boot 3, Spring Data JPA, Bean Validation, H2 (arquivo, para persistir entre restarts), springdoc-openapi (Swagger).
+
+Estrutura de pacotes (`com.dbserver.votacao`):
+
+- `model` - entidades JPA (`Pauta`, `SessaoVotacao`, `Voto`)
+- `repository` - repositórios Spring Data
+- `service` - regras de negócio (`PautaService`, `SessaoVotacaoService`, `VotoService`, `ResultadoVotacaoService`)
+- `controller` - endpoints REST
+- `dto` - objetos de entrada/saída da API
+- `client` - `ValidadorCpfClient`, client fake que simula a integração externa de validação de CPF (tarefa bônus 1)
+- `exception` - exceções de negócio e o `@RestControllerAdvice` que converte tudo em respostas HTTP coerentes
+
+Endpoints principais (prefixo `/api/v1`):
+
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | `/pautas` | Cadastra uma pauta |
+| GET | `/pautas` | Lista todas as pautas |
+| GET | `/pautas/{id}` | Busca uma pauta |
+| POST | `/pautas/{id}/sessao` | Abre a sessão de votação (corpo opcional `{ "duracaoEmMinutos": 5 }`, default 1 minuto) |
+| GET | `/pautas/{id}/sessao` | Consulta a sessão da pauta |
+| POST | `/pautas/{id}/votos` | Registra o voto de um associado (`{ "cpfAssociado": "12345678900", "opcao": "SIM" }`) |
+| GET | `/pautas/{id}/resultado` | Apura o resultado (votos Sim/Não e vencedor) |
+
+Documentação interativa (Swagger UI) disponível em `/swagger-ui.html` com a aplicação rodando.
+
+**Persistência:** o H2 roda em modo arquivo (`./backend/data/votacao.mv.db`), então os dados sobrevivem a um restart da aplicação, como pede o desafio.
+
+**Validação de CPF (bônus 1):** `ValidadorCpfClient` sorteia aleatoriamente se o CPF é válido (senão lança exceção que vira `404`) e, sendo válido, sorteia se o associado está `ABLE_TO_VOTE` ou `UNABLE_TO_VOTE`.
+
+**Versionamento da API (bônus 3):** optei por versionamento via URI (`/api/v1/...`). É a abordagem mais simples de explicar, testar e documentar, além de deixar bem visível pro consumidor da API qual contrato ele está usando. Uma v2 poderia conviver junto sem quebrar quem já integrou com a v1.
+
+**Sobre performance (bônus 2):** o resultado é apurado com `COUNT` no banco (e não trazendo todos os votos pra memória), e o índice único em `(sessao_id, cpf_associado)` evita voto duplicado e acelera a checagem. Para o cenário de centenas de milhares de votos, os pontos de atenção seriam: paginação na listagem de pautas, índice composto (já criado via `@UniqueConstraint`) e, se necessário, mover a contagem para um contador incremental atualizado a cada voto.
+
+#### Como rodar o backend
+
+```
+cd backend
+mvn spring-boot:run
+```
+
+A API sobe em `http://localhost:8080`.
+
+#### Como rodar os testes do backend
+
+```
+cd backend
+mvn test
+```
+
+Foram feitos testes unitários (Mockito, para as regras de negócio dos services) e testes de integração (`@SpringBootTest` + `MockMvc`, cobrindo o fluxo completo: cadastrar pauta → abrir sessão → votar → apurar resultado, além de cenários de erro como voto duplicado e pauta inexistente).
+
+### Frontend
+
+**Stack:** React 18 (Create React App) + React Router. Interface simples e responsiva com três telas: lista de pautas, cadastro de pauta e detalhes da pauta (onde é possível abrir a sessão, votar e ver o resultado).
+
+#### Como rodar o frontend
+
+```
+cd frontend
+npm install
+npm start
+```
+
+A aplicação sobe em `http://localhost:3000` e já aponta para `http://localhost:8080/api/v1` (configurável em `frontend/.env`).
+
+---
+
 # desafio-votacao

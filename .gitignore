@@ -1,0 +1,14 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Backend
+backend/target/
+backend/*.class
+backend/data/
+
+# Frontend
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.env.local
